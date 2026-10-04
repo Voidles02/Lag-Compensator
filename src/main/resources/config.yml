@@ -1,0 +1,84 @@
+# LagComp configuration. All values are validated and clamped on load; bad values never crash the plugin.
+
+# How much position history is kept per player (ms). ~750 ms covers a 500 ms ping plus interpolation.
+# Memory per player is constant: (history-length-ms / 50 + 3) samples of ~53 bytes.
+history-length-ms: 750
+
+# Minimal mode: melee only. Forces projectiles and entity tracking off and registers only the melee listeners.
+minimal-mode: false
+
+# Worlds where compensation runs. Empty list = every world.
+enabled-worlds: []
+
+rewind:
+  # Lower / upper clamp for the final rewind (max is limited to 500 and to history-length-ms - 60).
+  min-ms: 0
+  max-ms: 250
+  # Extra allowance for the client-side interpolation delay (added to the attacker's ping).
+  interpolation-ms: 50
+
+ping:
+  # Exponential moving average factor (0.01 - 1.0). Higher = reacts faster, lower = smoother.
+  smoothing-factor: 0.3
+  # Rolling median window (1 - 5). The median is what feeds the average, so single spikes are ignored.
+  median-window: 3
+  # Attackers whose smoothed ping is below this get plain vanilla behaviour.
+  low-ping-threshold-ms: 10
+  # How often (ticks) the reported ping is read. Cheap; only changed values are processed.
+  sample-interval-ticks: 10
+
+# High-ping scaling curve: rewind = ping + interpolation. Up to full-until-ms it is applied in full;
+# every ms above that only counts as slope-above ms (0.0 = flat cap, 1.0 = no scaling).
+scaling:
+  full-until-ms: 150
+  slope-above: 0.5
+
+# Shrink the rewind when the victim has a much lower ping than the attacker.
+favour-defender:
+  enabled: true
+  min-ping-difference-ms: 100
+  rewind-multiplier: 0.6
+
+# Reach check against the rewound hitbox (eye position -> nearest point of the hitbox).
+# A hit is denied only if it is out of reach (limit + tolerance) at BOTH the current and the rewound position.
+reach:
+  limit: 3.0
+  tolerance: 1.0
+
+melee:
+  enabled: true
+  # Rotate vanilla's knockback direction to match the rewound geometry.
+  rewound-knockback: true
+
+projectiles:
+  enabled: true
+  # Maximum projectiles tracked at once (fixed-size arrays).
+  max-tracked: 32
+  # A projectile is only tracked / swept for this many ticks after launch.
+  max-flight-ticks: 40
+  # Same 0.3 margin vanilla uses when testing projectile vs entity hitboxes.
+  hitbox-inflate: 0.3
+  # Never pull a projectile further than this (blocks) towards the target's current position.
+  max-pull-distance: 6.0
+
+# Rewinds mobs too. Only mobs that currently target a player are tracked (bounded, expire automatically).
+entity-tracking:
+  enabled: false
+  max-tracked: 64
+  ttl-seconds: 60
+
+# Distance (blocks) a player may move in one tick before the movement is treated as a teleport
+# and the history is cleared.
+teleport-detect-blocks: 8.0
+
+# Players with unstable or inflated ping (lag switching) get no compensation for penalty-seconds.
+abuse:
+  # Any reported ping above this flags immediately.
+  max-ping-ms: 600
+  # A sample counts as a spike if it is above (median * spike-factor + spike-min-ms).
+  spike-factor: 2.0
+  spike-min-ms: 80
+  # This many spikes inside window-seconds flags the player.
+  spike-count: 3
+  window-seconds: 30
+  penalty-seconds: 60

@@ -1,0 +1,34 @@
+name: LagComp
+version: '1.0.0'
+main: com.lagcomp.LagCompPlugin
+api-version: '1.21'
+description: Lightweight server-side lag compensation for combat (vanilla clients, no packet libraries).
+authors: [Voidles02]
+libraries:
+  - org.jetbrains.kotlin:kotlin-stdlib:2.0.21
+
+commands:
+  lagcomp:
+    description: LagComp status, debug and reload
+    usage: /<command> <status|debug <player>|reload>
+
+permissions:
+  lagcomp.admin:
+    description: All LagComp permissions
+    default: op
+    children:
+      lagcomp.status: true
+      lagcomp.debug: true
+      lagcomp.reload: true
+  lagcomp.status:
+    description: Use /lagcomp status
+    default: op
+  lagcomp.debug:
+    description: Use /lagcomp debug <player>
+    default: op
+  lagcomp.reload:
+    description: Use /lagcomp reload
+    default: op
+  lagcomp.bypass:
+    description: Never receives lag compensation (vanilla behaviour only)
+    default: false
