@@ -27,6 +27,11 @@ class LagCompPlugin : JavaPlugin() {
     override fun onEnable() {
         saveDefaultConfig()
         settings = Settings(config)
+        logger.info("+--------------------------------------+")
+        logger.info("|               LagComp                |")
+        logger.info("|  Server-side combat lag compensation |")
+        logger.info("|  Version ${description.version.padEnd(28)}|")
+        logger.info("+--------------------------------------+")
         getCommand("lagcomp")?.setExecutor(LagCompCommand(this))
         startRuntime()
         logger.info("LagComp enabled (${if (settings.minimalMode) "minimal" else "full"} mode).")
@@ -84,6 +89,7 @@ class LagCompPlugin : JavaPlugin() {
         val d = players.remove(p.uniqueId) ?: return
         playerList.remove(d)
         projectiles.removeShooter(d)
+        entities.removeTarget(p.uniqueId)
     }
 
     fun clearAllHistory() {

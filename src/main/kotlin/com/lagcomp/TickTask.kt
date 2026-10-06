@@ -36,7 +36,7 @@ class TickTask(private val plugin: LagCompPlugin) : Runnable {
             }
             plugin.entities.tick(now)
             plugin.projectiles.tick(now)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }

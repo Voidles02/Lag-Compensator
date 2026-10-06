@@ -71,8 +71,8 @@ class History(private val cap: Int) {
         val tNew = ts[phys(n - 1)]
         val tOld = ts[phys(0)]
         if (target < tOld) return false
-        if (target >= tNew) {
-            if (target - tNew > MAX_GAP_MS) return false
+        if (target > tNew) return false
+        if (target == tNew) {
             fill(out, phys(n - 1))
             return true
         }

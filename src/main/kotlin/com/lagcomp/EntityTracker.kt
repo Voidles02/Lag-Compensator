@@ -9,7 +9,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import java.util.UUID
 
-class TrackedEntity(val entity: LivingEntity, capacity: Int, var expireTick: Int) {
+class TrackedEntity(val entity: LivingEntity, capacity: Int, var expireTick: Int, var targetPlayerId: UUID) {
     val history = History(capacity)
     var px = 0.0
     var py = 0.0
@@ -41,16 +41,24 @@ class EntityTracker(private val plugin: LagCompPlugin, private val cap: Int) {
         }
     }
 
-    fun track(e: LivingEntity, ttlTicks: Int) {
+    fun track(e: LivingEntity, targetPlayerId: UUID, ttlTicks: Int) {
         val existing = byId[e.uniqueId]
         if (existing != null) {
             existing.expireTick = plugin.tick + ttlTicks
+            existing.targetPlayerId = targetPlayerId
             return
         }
         if (size >= cap) return
-        val te = TrackedEntity(e, plugin.settings.capacity, plugin.tick + ttlTicks)
+        val te = TrackedEntity(e, plugin.settings.capacity, plugin.tick + ttlTicks, targetPlayerId)
         slots[size++] = te
         byId[e.uniqueId] = te
+    }
+
+    fun removeTarget(playerId: UUID) {
+        var i = 0
+        while (i < size) {
+            if (slots[i]!!.targetPlayerId == playerId) removeAt(i) else i++
+        }
     }
 
     fun tick(now: Long) {
@@ -120,8 +128,8 @@ class EntityListener(private val plugin: LagCompPlugin) : Listener {
                 plugin.entities.untrack(mob.uniqueId)
                 return
             }
-            plugin.entities.track(mob, plugin.settings.entityTtlTicks)
-        } catch (t: Throwable) {
+            plugin.entities.track(mob, target.uniqueId, plugin.settings.entityTtlTicks)
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }

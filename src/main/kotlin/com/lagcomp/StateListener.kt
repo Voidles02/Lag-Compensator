@@ -18,7 +18,7 @@ class StateListener(private val plugin: LagCompPlugin) : Listener {
     fun onJoin(e: PlayerJoinEvent) {
         try {
             plugin.addPlayer(e.player)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }
@@ -27,7 +27,7 @@ class StateListener(private val plugin: LagCompPlugin) : Listener {
     fun onQuit(e: PlayerQuitEvent) {
         try {
             plugin.removePlayer(e.player)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }
@@ -64,7 +64,7 @@ class StateListener(private val plugin: LagCompPlugin) : Listener {
             }
             plugin.entities.clearWorld(e.world)
             plugin.projectiles.clearWorld(e.world)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }

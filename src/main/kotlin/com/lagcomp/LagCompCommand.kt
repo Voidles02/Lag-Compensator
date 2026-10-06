@@ -9,7 +9,10 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (args.isEmpty()) {
-            sender.sendMessage("§6LagComp §7- /$label <status|debug <player>|reload>")
+            sender.sendMessage("§8§m------------------§r §6LagComp §8§m------------------")
+            sender.sendMessage("§e/$label status §8- §7View runtime and tracking statistics")
+            if (sender.hasPermission("lagcomp.debug")) sender.sendMessage("§e/$label debug <player> §8- §7Inspect hit compensation")
+            if (sender.hasPermission("lagcomp.reload")) sender.sendMessage("§e/$label reload §8- §7Reload configuration")
             return true
         }
         when (args[0].lowercase()) {
@@ -17,9 +20,11 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
             "debug" -> if (sender.hasPermission("lagcomp.debug")) debug(sender, args) else deny(sender)
             "reload" -> if (sender.hasPermission("lagcomp.reload")) {
                 plugin.reloadAll()
-                sender.sendMessage("§aLagComp reloaded.")
+                sender.sendMessage("§8[§6LagComp§8] §aConfiguration reloaded successfully.")
             } else deny(sender)
-            else -> sender.sendMessage("§6LagComp §7- /$label <status|debug <player>|reload>")
+            else -> {
+                sender.sendMessage("§cUnknown subcommand. §7Use /$label for help.")
+            }
         }
         return true
     }
@@ -38,14 +43,17 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
             if (d.enabled && !d.isFlagged(now) && d.emaPing >= s.lowPingMs) compensating++
         }
         val perPlayer = History.estimateBytes(s.capacity) + 450L
-        sender.sendMessage("§6LagComp §7v${plugin.description.version} §8- §aON §7(${if (s.minimalMode) "minimal" else "full"} mode)")
-        sender.sendMessage("§7Melee: §f${s.meleeEnabled} §7Projectiles: §f${s.projectilesEnabled} §7Entity tracking: §f${s.entityTrackingEnabled}")
-        sender.sendMessage("§7Worlds: §f${if (s.worlds.isEmpty()) "all" else s.worlds.joinToString()}")
-        sender.sendMessage("§7Tracked players: §f${plugin.playerList.size} §7(compensating now: §f$compensating§7)")
-        sender.sendMessage("§7Tracked mobs: §f${plugin.entities.size} §7In-flight projectiles: §f${plugin.projectiles.size}")
-        sender.sendMessage("§7Estimated history memory: §f${plugin.playerList.size * perPlayer / 1024} KB §7(~${perPlayer} B/player)")
-        sender.sendMessage("§7Melee checks: §f${st.checked} §7allowed now/rewound: §f${st.allowedCurrent}/${st.allowedRewound} §7denied: §f${st.denied} §7no data: §f${st.noData}")
-        sender.sendMessage("§7Skipped low-ping: §f${st.skippedLowPing} §7skipped flagged: §f${st.skippedFlagged} §7projectiles pulled: §f${st.rescuedProjectiles} §7errors: §f${st.errors}")
+        sender.sendMessage("§8§m------------------§r §6LagComp §8§m------------------")
+        sender.sendMessage("§7Version §f${plugin.description.version} §8| §7Status §a● Enabled §8| §7Mode §f${if (s.minimalMode) "Minimal" else "Full"}")
+        sender.sendMessage("§6Features")
+        sender.sendMessage(" §8• §7Melee §f${enabled(s.meleeEnabled)} §8| §7Projectiles §f${enabled(s.projectilesEnabled)} §8| §7Entity tracking §f${enabled(s.entityTrackingEnabled)}")
+        sender.sendMessage(" §8• §7Worlds §f${if (s.worlds.isEmpty()) "All" else s.worlds.joinToString()}")
+        sender.sendMessage("§6Tracking")
+        sender.sendMessage(" §8• §7Players §f${plugin.playerList.size} §8(§7compensating §f$compensating§8) §8| §7Mobs §f${plugin.entities.size} §8| §7Projectiles §f${plugin.projectiles.size}")
+        sender.sendMessage(" §8• §7Estimated history §f${plugin.playerList.size * perPlayer / 1024} KB §8(§7~${perPlayer} B/player§8)")
+        sender.sendMessage("§6Hit decisions")
+        sender.sendMessage(" §8• §7Checked §f${st.checked} §8| §7Current/rewound §f${st.allowedCurrent}/${st.allowedRewound} §8| §7Denied §c${st.denied} §8| §7No data §f${st.noData}")
+        sender.sendMessage(" §8• §7Low-ping/flagged skips §f${st.skippedLowPing}/${st.skippedFlagged} §8| §7Projectiles rescued §f${st.rescuedProjectiles} §8| §7Errors §c${st.errors}")
     }
 
     private fun debug(sender: CommandSender, args: Array<out String>) {
@@ -69,11 +77,11 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
             d.emaPing < s.lowPingMs -> "below low-ping threshold (${s.lowPingMs} ms) - vanilla"
             else -> "compensating"
         }
-        sender.sendMessage("§6LagComp debug: §f${target.name}")
-        sender.sendMessage("§7Ping raw/median/smoothed: §f${d.lastRawPing}/${d.medianPing}/${"%.1f".format(d.emaPing)} ms")
-        sender.sendMessage("§7State: §f$state")
-        sender.sendMessage("§7Current rewind: §f${if (rewind < 0) 0 else rewind} ms §7(max ${s.maxRewindMs})")
-        sender.sendMessage("§7History: §f${d.history.count} samples over ${d.history.spanMs()} ms")
+        sender.sendMessage("§8§m------------------§r §6LagComp Debug §8§m------------------")
+        sender.sendMessage("§7Player §f${target.name} §8| §7State §f$state")
+        sender.sendMessage("§7Ping raw/median/smoothed §f${d.lastRawPing}/${d.medianPing}/${"%.1f".format(d.emaPing)} ms")
+        sender.sendMessage("§7Rewind §f${if (rewind < 0) 0 else rewind} ms §8/ §7maximum §f${s.maxRewindMs} ms")
+        sender.sendMessage("§7History §f${d.history.count} samples §8over §f${d.history.spanMs()} ms")
         if (d.decisionCount == 0) {
             sender.sendMessage("§7No hit decisions recorded yet.")
             return
@@ -89,8 +97,11 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
                 .toMutableList()
         }
         if (args.size == 2 && args[0].equals("debug", true)) {
+            if (!sender.hasPermission("lagcomp.debug")) return mutableListOf()
             return Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], true) }.toMutableList()
         }
         return mutableListOf()
     }
+
+    private fun enabled(value: Boolean) = if (value) "§aON" else "§cOFF"
 }

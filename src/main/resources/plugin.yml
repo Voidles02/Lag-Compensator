@@ -1,5 +1,5 @@
 name: LagComp
-version: '1.0.0'
+version: '1.1.0'
 main: com.lagcomp.LagCompPlugin
 api-version: '1.21'
 description: Lightweight server-side lag compensation for combat (vanilla clients, no packet libraries).

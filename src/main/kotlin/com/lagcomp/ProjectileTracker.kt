@@ -33,6 +33,7 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     private val lastZ = DoubleArray(cap)
     private val rewind = IntArray(cap)
     private val age = IntArray(cap)
+    private val playersByWorld = HashMap<World, ArrayList<PlayerData>>()
     var size = 0
         private set
 
@@ -63,8 +64,21 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     }
 
     fun tick(now: Long) {
-        if (size == 0) return
+        if (size == 0) {
+            for (candidates in playersByWorld.values) candidates.clear()
+            return
+        }
         val s = plugin.settings
+        for (candidates in playersByWorld.values) candidates.clear()
+        val playerList = plugin.playerList
+        var playerIndex = 0
+        while (playerIndex < playerList.size) {
+            val player = playerList[playerIndex++]
+            if (player.enabled) {
+                val world = player.world ?: continue
+                playersByWorld.getOrPut(world) { ArrayList() }.add(player)
+            }
+        }
         var i = 0
         while (i < size) {
             val p = projs[i]!!
@@ -101,7 +115,7 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
 
     private fun scan(p: Projectile, shooter: PlayerData, rewoundTime: Long, s: Settings): Boolean {
         val world = p.world
-        val list = plugin.playerList
+        val list = playersByWorld[world] ?: return false
         val inf = s.projectileInflate
         val n = list.size
         var j = 0
@@ -198,6 +212,7 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     }
 
     fun clearWorld(w: World) {
+        playersByWorld.remove(w)
         var i = 0
         while (i < size) {
             if (projs[i]!!.world === w) removeAt(i) else i++
@@ -207,6 +222,7 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     fun clear() {
         java.util.Arrays.fill(projs, null)
         java.util.Arrays.fill(shooters, null)
+        for (candidates in playersByWorld.values) candidates.clear()
         size = 0
     }
 
@@ -229,7 +245,7 @@ class ProjectileListener(private val plugin: LagCompPlugin) : Listener {
             val rewind = plugin.computeRewind(d, -1, System.nanoTime() / 1_000_000L)
             if (rewind <= 0) return
             plugin.projectiles.track(p, d, rewind)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }

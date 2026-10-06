@@ -25,7 +25,7 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
             // Invalidate the prior attack's hint before any early return, so it cannot affect a later hit this tick.
             plugin.kbHint.tick = -1
             handle(damager, e)
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }
@@ -91,7 +91,7 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
             return
         }
 
-        if (s.rewoundKnockback) prepareKnockback(damager, victim.entityId, victim.x, victim.z)
+        if (s.rewoundKnockback && rewDist <= limit) prepareKnockback(damager, victim.entityId, victim.x, victim.z)
     }
 
     /**
@@ -131,7 +131,7 @@ class KnockbackListener(private val plugin: LagCompPlugin) : Listener {
             k.setX(nx)
             k.setZ(nz)
             e.knockback = k
-        } catch (t: Throwable) {
+        } catch (t: Exception) {
             plugin.reportError(t)
         }
     }

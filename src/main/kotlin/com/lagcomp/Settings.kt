@@ -9,7 +9,7 @@ class Settings(c: FileConfiguration) {
     val historyMs = c.getInt("history-length-ms", 750).coerceIn(300, 2000)
     val capacity = historyMs / 50 + 3
 
-    val minRewindMs = c.getInt("rewind.min-ms", 0).coerceIn(0, 500)
+    val minRewindMs = c.getInt("rewind.min-ms", 0).coerceIn(0, 500).coerceAtMost(historyMs - 60)
     val maxRewindMs = c.getInt("rewind.max-ms", 250).coerceIn(minRewindMs, 500)
         .coerceAtMost(historyMs - 60).coerceAtLeast(minRewindMs)
     val interpolationMs = c.getInt("rewind.interpolation-ms", 50).coerceIn(0, 200)
