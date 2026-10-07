@@ -44,10 +44,8 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
         val st = plugin.stats
         val now = System.nanoTime() / 1_000_000L
         var compensating = 0
-        var bots = 0
         for (d in plugin.playerList) {
             if (d.enabled && !d.isFlagged(now) && d.emaPing >= s.lowPingMs) compensating++
-            if (d.transientBot) bots++
         }
         val perPlayer = History.estimateBytes(s.capacity) + 450L
         val active = s.meleeEnabled || s.projectilesEnabled || s.entityTrackingEnabled
@@ -55,7 +53,7 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
         sender.sendMessage("§7v${plugin.description.version} §8• §7Runtime ${if (active) "§aACTIVE" else "§eIDLE (all features off)"} §8• §7Mode §f${if (s.minimalMode) "Minimal" else "Full"}")
         sender.sendMessage("§6Features §8/ §7Melee ${enabled(s.meleeEnabled)} §8• §7Projectiles ${enabled(s.projectilesEnabled)} §8• §7Mob tracking ${enabled(s.entityTrackingEnabled)}")
         sender.sendMessage("§7Worlds §f${if (s.worlds.isEmpty()) "All" else s.worlds.joinToString()}")
-        sender.sendMessage("§6Tracking §8/ §7Players §f${plugin.playerList.size} §8(§7compensating §f$compensating§8) §8• §7Bot players §f$bots §8/ §f${if (s.botCompatibilityEnabled) s.botMaxTracked else 0} §8• §7Mobs §f${plugin.entities.size} §8• §7Projectiles §f${plugin.projectiles.size}")
+        sender.sendMessage("§6Tracking §8/ §7Players §f${plugin.playerList.size} §8(§7compensating §f$compensating§8) §8• §7Bot PvP §f${if (s.botCompatibilityEnabled && s.botIgnoreFakePlayers) "vanilla pass-through" else "off"} §8• §7Mobs §f${plugin.entities.size} §8• §7Projectiles §f${plugin.projectiles.size}")
         sender.sendMessage("§7Estimated history §f${plugin.playerList.size * perPlayer / 1024} KB §8(§7~${perPlayer} B/player§8)")
         sender.sendMessage("§6Combat §8/ §7Checked §f${st.checked} §8• §7Current/rewound §f${st.allowedCurrent}/${st.allowedRewound} §8• §7Denied §c${st.denied} §8• §7No history §f${st.noData}")
         sender.sendMessage("§7Low-ping/flagged skips §f${st.skippedLowPing}/${st.skippedFlagged} §8• §7Rescued projectiles §f${st.rescuedProjectiles} §8• §7Errors §c${st.errors}")
@@ -83,7 +81,7 @@ class LagCompCommand(private val plugin: LagCompPlugin) : TabExecutor {
             else -> "compensating"
         }
         sender.sendMessage("§8§m--------------------§r §6LagComp §7Debug §8§m--------------------")
-        sender.sendMessage("§7Player §f${target.name} §8• §7State §f$state${if (d.transientBot) " §8• §bPvP bot" else ""}")
+        sender.sendMessage("§7Player §f${target.name} §8• §7State §f$state")
         sender.sendMessage("§7Ping raw/median/smoothed §f${d.lastRawPing}/${d.medianPing}/${"%.1f".format(d.emaPing)} ms")
         sender.sendMessage("§7Rewind §f${if (rewind < 0) 0 else rewind} ms §8/ §7maximum §f${s.maxRewindMs} ms")
         sender.sendMessage("§7History §f${d.history.count} samples §8over §f${d.history.spanMs()} ms")

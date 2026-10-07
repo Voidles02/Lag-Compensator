@@ -33,8 +33,10 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
 
     private fun handle(damager: Player, e: EntityDamageByEntityEvent) {
         val s = plugin.settings
+        val victimPlayer = e.entity as? Player
+        if (plugin.isFakePlayer(damager) || (victimPlayer != null && plugin.isFakePlayer(victimPlayer))) return
         val now = System.nanoTime() / 1_000_000L
-        val att = plugin.getCombatPlayer(damager, now) ?: return
+        val att = plugin.players[damager.uniqueId] ?: return
         if (!att.enabled) return
 
         val victim = e.entity
@@ -42,7 +44,7 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
         var victimPing = -1
         val label: String
         if (victim is Player) {
-            val vd = plugin.getCombatPlayer(victim, now) ?: return
+            val vd = plugin.players[victim.uniqueId] ?: return
             if (!vd.enabled) return
             hist = vd.history
             if (vd.emaPing >= 0.0) victimPing = vd.emaPing.toInt()

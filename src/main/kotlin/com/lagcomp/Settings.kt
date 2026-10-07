@@ -17,7 +17,7 @@ class Settings(c: FileConfiguration) {
     val smoothing = c.getDouble("ping.smoothing-factor", 0.3).coerceIn(0.01, 1.0)
     val medianWindow = c.getInt("ping.median-window", 3).coerceIn(1, 5)
     val lowPingMs = c.getInt("ping.low-ping-threshold-ms", 10).coerceIn(0, 500)
-    val pingSampleTicks = c.getInt("ping.sample-interval-ticks", 10).coerceIn(1, 200)
+    val pingSampleTicks = c.getInt("ping.sample-interval-ticks", 2).coerceIn(1, 200)
 
     val scaleStartMs = c.getInt("scaling.full-until-ms", 150).coerceIn(0, 500)
     val scaleSlope = c.getDouble("scaling.slope-above", 0.5).coerceIn(0.0, 1.0)
@@ -33,8 +33,9 @@ class Settings(c: FileConfiguration) {
     val rewoundKnockback = c.getBoolean("melee.rewound-knockback", true)
 
     val botCompatibilityEnabled = c.getBoolean("bot-compatibility.enabled", true)
-    val botMaxTracked = c.getInt("bot-compatibility.max-tracked", 64).coerceIn(0, 256)
-    val botIdleTimeoutTicks = c.getInt("bot-compatibility.idle-timeout-seconds", 60).coerceIn(5, 600) * 20
+    val botIgnoreFakePlayers = c.getBoolean("bot-compatibility.ignore-fake-players", true)
+    val botMissingAddressIsFake = c.getBoolean("bot-compatibility.detect-missing-address", true)
+    val botMetadata = c.getStringList("bot-compatibility.ignore-player-metadata").toHashSet()
 
     val projectilesEnabled = !minimalMode && c.getBoolean("projectiles.enabled", true)
     val projectileMaxTracked = c.getInt("projectiles.max-tracked", 32).coerceIn(1, 256)

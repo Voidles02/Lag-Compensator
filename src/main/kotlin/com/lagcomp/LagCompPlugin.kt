@@ -16,7 +16,6 @@ class LagCompPlugin : JavaPlugin() {
     // Bounded by the number of online players; entries removed on quit/reload/disable.
     val players = HashMap<UUID, PlayerData>(64)
     val playerList = ArrayList<PlayerData>(64)
-    private var transientBotCount = 0
 
     val stats = Stats()
     val kbHint = KnockbackHint()
@@ -27,6 +26,7 @@ class LagCompPlugin : JavaPlugin() {
 
     override fun onEnable() {
         saveDefaultConfig()
+        ensureBotConfig()
         settings = Settings(config)
         logger.info("+--------------------------------------+")
         logger.info("|               LagComp                |")
@@ -44,6 +44,7 @@ class LagCompPlugin : JavaPlugin() {
 
     fun reloadAll() {
         reloadConfig()
+        ensureBotConfig()
         settings = Settings(config)
         stopRuntime()
         startRuntime()
@@ -76,50 +77,46 @@ class LagCompPlugin : JavaPlugin() {
         HandlerList.unregisterAll(this)
         players.clear()
         playerList.clear()
-        transientBotCount = 0
         if (::entities.isInitialized) entities.clear()
         if (::projectiles.isInitialized) projectiles.clear()
     }
 
     fun addPlayer(p: Player) {
+        if (isFakePlayer(p)) return
         if (players.containsKey(p.uniqueId)) return
         val d = PlayerData(p, settings)
         players[p.uniqueId] = d
         playerList.add(d)
     }
 
-    fun getCombatPlayer(p: Player, now: Long): PlayerData? {
-        val existing = players[p.uniqueId]
-        if (existing != null) {
-            if (existing.transientBot) existing.lastInteractionTick = tick
-            return existing
-        }
+    fun isFakePlayer(p: Player): Boolean {
         val s = settings
-        if (!s.botCompatibilityEnabled || transientBotCount >= s.botMaxTracked) return null
-        val data = PlayerData(p, s, transientBot = true)
-        data.lastInteractionTick = tick
-        data.snapshot(now, s)
-        players[p.uniqueId] = data
-        playerList.add(data)
-        transientBotCount++
-        return data
+        if (!s.botCompatibilityEnabled || !s.botIgnoreFakePlayers) return false
+        if (!p.isOnline) return true
+        if (s.botMissingAddressIsFake && p.address == null) return true
+        return s.botMetadata.any(p::hasMetadata)
     }
 
-    fun pruneIdleBotPlayers() {
-        var i = playerList.lastIndex
-        while (i >= 0) {
-            val data = playerList[i]
-            if (data.transientBot && tick - data.lastInteractionTick > settings.botIdleTimeoutTicks) {
-                removePlayer(data.player)
+    private fun ensureBotConfig() {
+        val defaults = mapOf<String, Any>(
+            "bot-compatibility.enabled" to true,
+            "bot-compatibility.ignore-fake-players" to true,
+            "bot-compatibility.detect-missing-address" to true,
+            "bot-compatibility.ignore-player-metadata" to listOf("NPC", "fakeplayer", "FakePlayer", "fake-player", "PPvPBot")
+        )
+        var changed = false
+        for ((path, value) in defaults) {
+            if (!config.contains(path, true)) {
+                config.set(path, value)
+                changed = true
             }
-            i--
         }
+        if (changed) saveConfig()
     }
 
     fun removePlayer(p: Player) {
         val d = players.remove(p.uniqueId) ?: return
         playerList.remove(d)
-        if (d.transientBot) transientBotCount--
         projectiles.removeShooter(d)
         entities.removeTarget(p.uniqueId)
     }

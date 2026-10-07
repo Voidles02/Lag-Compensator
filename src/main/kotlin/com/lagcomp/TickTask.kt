@@ -10,7 +10,6 @@ class TickTask(private val plugin: LagCompPlugin) : Runnable {
     override fun run() {
         try {
             plugin.tick++
-            plugin.pruneIdleBotPlayers()
             val list = plugin.playerList
             val n = list.size
 

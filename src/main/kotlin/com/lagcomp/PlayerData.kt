@@ -23,9 +23,8 @@ object Decision {
  * Everything LagComp keeps per online player: position history, ping filter, abuse state and the
  * last few hit decisions. All fixed-size; allocated on join, dropped on quit.
  */
-class PlayerData(val player: Player, s: Settings, val transientBot: Boolean = false) {
+class PlayerData(val player: Player, s: Settings) {
     val history = History(s.capacity)
-    var lastInteractionTick = 0
 
     var world: World? = null
         private set

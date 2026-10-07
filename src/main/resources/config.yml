@@ -24,8 +24,8 @@ ping:
   median-window: 3
   # Attackers whose smoothed ping is below this get plain vanilla behaviour.
   low-ping-threshold-ms: 10
-  # How often (ticks) the reported ping is read. Cheap; only changed values are processed.
-  sample-interval-ticks: 10
+  # How often (ticks) reported ping is checked so changed values affect compensation sooner.
+  sample-interval-ticks: 2
 
 # High-ping scaling curve: rewind = ping + interpolation. Up to full-until-ms it is applied in full;
 # every ms above that only counts as slope-above ms (0.0 = flat cap, 1.0 = no scaling).
@@ -50,12 +50,18 @@ melee:
   # Rotate vanilla's knockback direction to match the rewound geometry.
   rewound-knockback: true
 
-# Supports fake Bukkit Player entities (including PvP bot plugins) through their normal damage events.
-# Unregistered players are tracked only after participating in melee, bounded, and removed when idle.
+# Fake-player hits are left to vanilla/server PvP rules. Add metadata keys used by bot plugins here.
+# Players without a network address are also treated as fake players when that check is enabled.
 bot-compatibility:
   enabled: true
-  max-tracked: 64
-  idle-timeout-seconds: 60
+  ignore-fake-players: true
+  detect-missing-address: true
+  ignore-player-metadata:
+    - NPC
+    - fakeplayer
+    - FakePlayer
+    - fake-player
+    - PPvPBot
 
 projectiles:
   enabled: true
