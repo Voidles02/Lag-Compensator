@@ -14,6 +14,7 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.util.Vector
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 /**
@@ -33,7 +34,28 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     private val lastZ = DoubleArray(cap)
     private val rewind = IntArray(cap)
     private val age = IntArray(cap)
-    private val playersByWorld = HashMap<World, ArrayList<PlayerData>>()
+    private class PlayerBuckets {
+        val all = ArrayList<PlayerData>()
+        val cells = HashMap<Long, PlayerCell>()
+
+        fun clear(tick: Int) {
+            all.clear()
+            for (cell in cells.values) cell.players.clear()
+            if (tick % CELL_PRUNE_INTERVAL == 0) {
+                val iterator = cells.entries.iterator()
+                while (iterator.hasNext()) {
+                    if (tick - iterator.next().value.lastUsedTick > CELL_PRUNE_INTERVAL) iterator.remove()
+                }
+            }
+        }
+    }
+
+    private class PlayerCell {
+        val players = ArrayList<PlayerData>()
+        var lastUsedTick = 0
+    }
+
+    private val playersByWorld = HashMap<World, PlayerBuckets>()
     var size = 0
         private set
 
@@ -65,18 +87,22 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
 
     fun tick(now: Long) {
         if (size == 0) {
-            for (candidates in playersByWorld.values) candidates.clear()
+            for (candidates in playersByWorld.values) candidates.clear(plugin.tick)
             return
         }
         val s = plugin.settings
-        for (candidates in playersByWorld.values) candidates.clear()
+        for (candidates in playersByWorld.values) candidates.clear(plugin.tick)
         val playerList = plugin.playerList
         var playerIndex = 0
         while (playerIndex < playerList.size) {
             val player = playerList[playerIndex++]
             if (player.enabled) {
                 val world = player.world ?: continue
-                playersByWorld.getOrPut(world) { ArrayList() }.add(player)
+                val buckets = playersByWorld.getOrPut(world) { PlayerBuckets() }
+                buckets.all.add(player)
+                val cell = buckets.cells.getOrPut(cellKey(player.px, player.pz)) { PlayerCell() }
+                cell.players.add(player)
+                cell.lastUsedTick = plugin.tick
             }
         }
         var i = 0
@@ -115,45 +141,73 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
 
     private fun scan(p: Projectile, shooter: PlayerData, rewoundTime: Long, s: Settings): Boolean {
         val world = p.world
-        val list = playersByWorld[world] ?: return false
-        val inf = s.projectileInflate
-        val n = list.size
-        var j = 0
-        while (j < n) {
-            val t = list[j]
-            j++
-            if (t === shooter || !t.enabled || t.world !== world) continue
-            // Cheap prefilter on the last snapshot position: rewinding moves a target only a few blocks.
-            val ddx = t.px - cx
-            val ddy = t.py - cy
-            val ddz = t.pz - cz
-            if (ddx * ddx + ddy * ddy + ddz * ddz > PREFILTER_SQ) continue
-            if (!t.history.sample(rewoundTime, sample)) continue
+        val buckets = playersByWorld[world] ?: return false
+        val minCellX = floor((minOf(lx, cx) - PREFILTER_RADIUS) / CELL_SIZE).toInt()
+        val maxCellX = floor((maxOf(lx, cx) + PREFILTER_RADIUS) / CELL_SIZE).toInt()
+        val minCellZ = floor((minOf(lz, cz) - PREFILTER_RADIUS) / CELL_SIZE).toInt()
+        val maxCellZ = floor((maxOf(lz, cz) + PREFILTER_RADIUS) / CELL_SIZE).toInt()
+        val cellCount = (maxCellX.toLong() - minCellX + 1) * (maxCellZ.toLong() - minCellZ + 1)
+        if (cellCount > MAX_CELL_QUERIES) {
+            var i = 0
+            while (i < buckets.all.size) {
+                if (checkTarget(p, buckets.all[i++], shooter, world, rewoundTime, s)) return true
+            }
+            return false
+        }
 
-            val hw = sample.w * 0.5 + inf
-            val entry = Geo.segmentBoxEntry(
-                lx, ly, lz, cx, cy, cz,
-                sample.x - hw, sample.y - inf, sample.z - hw,
-                sample.x + hw, sample.y + sample.h + inf, sample.z + hw
-            )
-            if (entry < 0.0) continue
-
-            val pl = t.player
-            val gm = pl.gameMode
-            if ((gm != GameMode.SURVIVAL && gm != GameMode.ADVENTURE) || pl.isDead || pl.isInvulnerable) continue
-
-            // If the current hitbox is already crossed, vanilla will register the hit itself.
-            val chw = pl.width * 0.5 + inf
-            val curEntry = Geo.segmentBoxEntry(
-                lx, ly, lz, cx, cy, cz,
-                pl.x - chw, pl.y - inf, pl.z - chw,
-                pl.x + chw, pl.y + pl.height + inf, pl.z + chw
-            )
-            if (curEntry >= 0.0) continue
-
-            if (pull(p, world, pl, entry, s)) return true
+        var cellX = minCellX
+        while (cellX <= maxCellX) {
+            var cellZ = minCellZ
+            while (cellZ <= maxCellZ) {
+                val candidates = buckets.cells[cellKey(cellX, cellZ)]?.players
+                if (candidates != null) {
+                    var i = 0
+                    while (i < candidates.size) {
+                        if (checkTarget(p, candidates[i++], shooter, world, rewoundTime, s)) return true
+                    }
+                }
+                cellZ++
+            }
+            cellX++
         }
         return false
+    }
+
+    private fun checkTarget(
+        p: Projectile,
+        t: PlayerData,
+        shooter: PlayerData,
+        world: World,
+        rewoundTime: Long,
+        s: Settings
+    ): Boolean {
+        val inf = s.projectileInflate
+        if (t === shooter || !t.enabled || t.world !== world) return false
+        val ddx = t.px - cx
+        val ddy = t.py - cy
+        val ddz = t.pz - cz
+        if (ddx * ddx + ddy * ddy + ddz * ddz > PREFILTER_SQ) return false
+        if (!t.history.sample(rewoundTime, sample)) return false
+
+        val hw = sample.w * 0.5 + inf
+        val entry = Geo.segmentBoxEntry(
+            lx, ly, lz, cx, cy, cz,
+            sample.x - hw, sample.y - inf, sample.z - hw,
+            sample.x + hw, sample.y + sample.h + inf, sample.z + hw
+        )
+        if (entry < 0.0) return false
+
+        val pl = t.player
+        val gm = pl.gameMode
+        if ((gm != GameMode.SURVIVAL && gm != GameMode.ADVENTURE) || pl.isDead || pl.isInvulnerable) return false
+
+        val chw = pl.width * 0.5 + inf
+        val curEntry = Geo.segmentBoxEntry(
+            lx, ly, lz, cx, cy, cz,
+            pl.x - chw, pl.y - inf, pl.z - chw,
+            pl.x + chw, pl.y + pl.height + inf, pl.z + chw
+        )
+        return curEntry < 0.0 && pull(p, world, pl, entry, s)
     }
 
     private fun pull(p: Projectile, world: World, pl: Player, entry: Double, s: Settings): Boolean {
@@ -222,12 +276,20 @@ class ProjectileTracker(private val plugin: LagCompPlugin, private val cap: Int)
     fun clear() {
         java.util.Arrays.fill(projs, null)
         java.util.Arrays.fill(shooters, null)
-        for (candidates in playersByWorld.values) candidates.clear()
+        for (candidates in playersByWorld.values) candidates.clear(plugin.tick)
         size = 0
     }
 
     companion object {
+        private const val CELL_SIZE = 16.0
+        private const val PREFILTER_RADIUS = 24.0
+        private const val MAX_CELL_QUERIES = 256L
+        private const val CELL_PRUNE_INTERVAL = 200
         private const val PREFILTER_SQ = 24.0 * 24.0
+
+        private fun cellKey(x: Double, z: Double): Long = cellKey(floor(x / CELL_SIZE).toInt(), floor(z / CELL_SIZE).toInt())
+
+        private fun cellKey(x: Int, z: Int): Long = (x.toLong() shl 32) xor (z.toLong() and 0xffffffffL)
     }
 }
 

@@ -23,8 +23,9 @@ object Decision {
  * Everything LagComp keeps per online player: position history, ping filter, abuse state and the
  * last few hit decisions. All fixed-size; allocated on join, dropped on quit.
  */
-class PlayerData(val player: Player, s: Settings) {
+class PlayerData(val player: Player, s: Settings, val transientBot: Boolean = false) {
     val history = History(s.capacity)
+    var lastInteractionTick = 0
 
     var world: World? = null
         private set
@@ -122,13 +123,15 @@ class PlayerData(val player: Player, s: Settings) {
      */
     fun samplePing(now: Long, s: Settings, log: Logger) {
         val raw = player.ping
-        if (raw < 0 || raw == lastRawPing) return
+        if (raw < 0) return
+        if (raw > s.maxPingMs) {
+            flag(now, s, log, "reported ping $raw ms exceeds abuse.max-ping-ms")
+        }
+        if (raw == lastRawPing) return
         lastRawPing = raw
 
         // Compare against the median from BEFORE this sample so a spike cannot hide itself.
-        if (raw > s.maxPingMs) {
-            flag(now, s, log, "reported ping $raw ms exceeds abuse.max-ping-ms")
-        } else if (pingCount >= 2 && raw > medianPing * s.spikeFactor + s.spikeMinMs) {
+        if (raw <= s.maxPingMs && pingCount >= 2 && raw > medianPing * s.spikeFactor + s.spikeMinMs) {
             if (now - spikeWindowStart > s.abuseWindowMs) {
                 spikeWindowStart = now
                 spikeCount = 0

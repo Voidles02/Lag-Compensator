@@ -16,6 +16,7 @@ class LagCompPlugin : JavaPlugin() {
     // Bounded by the number of online players; entries removed on quit/reload/disable.
     val players = HashMap<UUID, PlayerData>(64)
     val playerList = ArrayList<PlayerData>(64)
+    private var transientBotCount = 0
 
     val stats = Stats()
     val kbHint = KnockbackHint()
@@ -54,6 +55,7 @@ class LagCompPlugin : JavaPlugin() {
         errorLogged = false
         entities = EntityTracker(this, if (s.entityTrackingEnabled) s.entityMaxTracked else 0)
         projectiles = ProjectileTracker(this, if (s.projectilesEnabled) s.projectileMaxTracked else 0)
+        if (!s.meleeEnabled && !s.projectilesEnabled && !s.entityTrackingEnabled) return
         for (p in Bukkit.getOnlinePlayers()) addPlayer(p)
 
         val pm = server.pluginManager
@@ -74,6 +76,7 @@ class LagCompPlugin : JavaPlugin() {
         HandlerList.unregisterAll(this)
         players.clear()
         playerList.clear()
+        transientBotCount = 0
         if (::entities.isInitialized) entities.clear()
         if (::projectiles.isInitialized) projectiles.clear()
     }
@@ -85,9 +88,38 @@ class LagCompPlugin : JavaPlugin() {
         playerList.add(d)
     }
 
+    fun getCombatPlayer(p: Player, now: Long): PlayerData? {
+        val existing = players[p.uniqueId]
+        if (existing != null) {
+            if (existing.transientBot) existing.lastInteractionTick = tick
+            return existing
+        }
+        val s = settings
+        if (!s.botCompatibilityEnabled || transientBotCount >= s.botMaxTracked) return null
+        val data = PlayerData(p, s, transientBot = true)
+        data.lastInteractionTick = tick
+        data.snapshot(now, s)
+        players[p.uniqueId] = data
+        playerList.add(data)
+        transientBotCount++
+        return data
+    }
+
+    fun pruneIdleBotPlayers() {
+        var i = playerList.lastIndex
+        while (i >= 0) {
+            val data = playerList[i]
+            if (data.transientBot && tick - data.lastInteractionTick > settings.botIdleTimeoutTicks) {
+                removePlayer(data.player)
+            }
+            i--
+        }
+    }
+
     fun removePlayer(p: Player) {
         val d = players.remove(p.uniqueId) ?: return
         playerList.remove(d)
+        if (d.transientBot) transientBotCount--
         projectiles.removeShooter(d)
         entities.removeTarget(p.uniqueId)
     }

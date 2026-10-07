@@ -20,7 +20,8 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onAttack(e: EntityDamageByEntityEvent) {
         val damager = e.damager
-        if (damager !is Player || e.cause != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return
+        if (damager !is Player || (e.cause != EntityDamageEvent.DamageCause.ENTITY_ATTACK &&
+                e.cause != EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK)) return
         try {
             // Invalidate the prior attack's hint before any early return, so it cannot affect a later hit this tick.
             plugin.kbHint.tick = -1
@@ -32,7 +33,8 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
 
     private fun handle(damager: Player, e: EntityDamageByEntityEvent) {
         val s = plugin.settings
-        val att = plugin.players[damager.uniqueId] ?: return
+        val now = System.nanoTime() / 1_000_000L
+        val att = plugin.getCombatPlayer(damager, now) ?: return
         if (!att.enabled) return
 
         val victim = e.entity
@@ -40,7 +42,7 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
         var victimPing = -1
         val label: String
         if (victim is Player) {
-            val vd = plugin.players[victim.uniqueId] ?: return
+            val vd = plugin.getCombatPlayer(victim, now) ?: return
             if (!vd.enabled) return
             hist = vd.history
             if (vd.emaPing >= 0.0) victimPing = vd.emaPing.toInt()
@@ -51,7 +53,6 @@ class MeleeListener(private val plugin: LagCompPlugin) : Listener {
             label = victim.type.name
         }
 
-        val now = System.nanoTime() / 1_000_000L
         val rewind = plugin.computeRewind(att, victimPing, now)
         if (rewind == LagCompPlugin.FLAGGED) {
             plugin.stats.skippedFlagged++

@@ -32,6 +32,10 @@ class Settings(c: FileConfiguration) {
     val meleeEnabled = c.getBoolean("melee.enabled", true)
     val rewoundKnockback = c.getBoolean("melee.rewound-knockback", true)
 
+    val botCompatibilityEnabled = c.getBoolean("bot-compatibility.enabled", true)
+    val botMaxTracked = c.getInt("bot-compatibility.max-tracked", 64).coerceIn(0, 256)
+    val botIdleTimeoutTicks = c.getInt("bot-compatibility.idle-timeout-seconds", 60).coerceIn(5, 600) * 20
+
     val projectilesEnabled = !minimalMode && c.getBoolean("projectiles.enabled", true)
     val projectileMaxTracked = c.getInt("projectiles.max-tracked", 32).coerceIn(1, 256)
     val projectileMaxTicks = c.getInt("projectiles.max-flight-ticks", 40).coerceIn(2, 200)

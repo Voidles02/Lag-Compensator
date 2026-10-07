@@ -50,6 +50,13 @@ melee:
   # Rotate vanilla's knockback direction to match the rewound geometry.
   rewound-knockback: true
 
+# Supports fake Bukkit Player entities (including PvP bot plugins) through their normal damage events.
+# Unregistered players are tracked only after participating in melee, bounded, and removed when idle.
+bot-compatibility:
+  enabled: true
+  max-tracked: 64
+  idle-timeout-seconds: 60
+
 projectiles:
   enabled: true
   # Maximum projectiles tracked at once (fixed-size arrays).

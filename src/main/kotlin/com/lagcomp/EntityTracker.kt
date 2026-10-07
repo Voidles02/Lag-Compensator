@@ -44,6 +44,10 @@ class EntityTracker(private val plugin: LagCompPlugin, private val cap: Int) {
     fun track(e: LivingEntity, targetPlayerId: UUID, ttlTicks: Int) {
         val existing = byId[e.uniqueId]
         if (existing != null) {
+            if (existing.targetPlayerId != targetPlayerId) {
+                existing.history.clear()
+                existing.hasPrev = false
+            }
             existing.expireTick = plugin.tick + ttlTicks
             existing.targetPlayerId = targetPlayerId
             return
